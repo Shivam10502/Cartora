@@ -34,5 +34,7 @@ frontend/build/
 # =========================
 # OS
 # =========================
-.DS_Storeg
+.DS_Store
 Thumbs.db
+
+**/application-local.properties

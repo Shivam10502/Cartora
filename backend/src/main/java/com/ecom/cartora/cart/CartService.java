@@ -9,6 +9,7 @@ import com.ecom.cartora.product.Product;
 import com.ecom.cartora.product.ProductRepo;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,14 +37,59 @@ public class CartService {
     @Autowired
     private ProductRepo productRepo;
 
-    @Transactional
-    public CartResponse addProductTocart(AddToCartRequest request){
+    private CartResponse buildCartResponse(Cart cart, User user){
+        List<CartItem> cartItems = cartItemRepo.findByCartId(cart.getId());
+
+        List<CartItemResponse> itemResponses = new ArrayList<>();
+        for(CartItem item : cartItems){
+            Product itemProduct = item.getProduct();
+            CartItemResponse response = new CartItemResponse();
+            response.setCartItemId(item.getId());
+            response.setProductId(itemProduct.getId());
+            response.setProductName(itemProduct.getName());
+            response.setPrice(itemProduct.getPrice());
+            response.setQuantity(item.getQuantity());
+            BigDecimal subtotal =
+                    itemProduct.getPrice()
+                            .multiply(
+                                    BigDecimal.valueOf(item.getQuantity())
+                            );
+
+            response.setSubtotal(subtotal);
+
+            itemResponses.add(response);
+
+        }
+        CartResponse cartResponse = new CartResponse();
+
+        cartResponse.setCartId(cart.getId());
+        cartResponse.setUserId(user.getId());
+        cartResponse.setItems(itemResponses);
+
+        return cartResponse;
+    }
+
+
+    private User getUser(){
         Authentication authentication =
                 SecurityContextHolder.getContext().getAuthentication();
 
         String username = authentication.getName();
         User user = userRepo.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        return user;
+    }
+    private Cart getUserCart(User user){
+        Cart cart = cartRepo.findByUserId(user.getId())
+                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
+
+        return cart;
+    }
+    @Transactional
+    public CartResponse addProductToCart(AddToCartRequest request){
+
+        User user = getUser();
 
         Cart cart = cartRepo.findByUserId(user.getId())
                 .orElseGet(() -> {
@@ -94,93 +140,86 @@ public class CartService {
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepo.save(cart);
 
-        List<CartItem> cartItems = cartItemRepo.findByCartId(cart.getId());
-
-        List<CartItemResponse> itemResponses = new ArrayList<>();
-        for(CartItem item : cartItems){
-            Product itemProduct = item.getProduct();
-            CartItemResponse response = new CartItemResponse();
-            response.setCartItemId(item.getId());
-            response.setProductId(itemProduct.getId());
-            response.setProductName(itemProduct.getName());
-            response.setPrice(itemProduct.getPrice());
-            response.setQuantity(item.getQuantity());
-            BigDecimal subtotal =
-                    itemProduct.getPrice()
-                            .multiply(
-                                    BigDecimal.valueOf(item.getQuantity())
-                            );
-
-            response.setSubtotal(subtotal);
-
-            itemResponses.add(response);
-
-        }
-        CartResponse cartResponse = new CartResponse();
-
-        cartResponse.setCartId(cart.getId());
-        cartResponse.setUserId(user.getId());
-        cartResponse.setItems(itemResponses);
-
-        return cartResponse;
+        return buildCartResponse(cart,user);
     }
 
     public CartResponse getCart(){
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+        User user = getUser();
 
-        String username = authentication.getName();
-        User user = userRepo.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        Cart cart = getUserCart(user);
 
-        Cart cart = cartRepo.findByUserId(user.getId())
-                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
-
-
-        List<CartItem> cartItems = cartItemRepo.findByCartId(cart.getId());
-
-        List<CartItemResponse> itemResponses = new ArrayList<>();
-        for(CartItem item : cartItems){
-            Product itemProduct = item.getProduct();
-            CartItemResponse response = new CartItemResponse();
-            response.setCartItemId(item.getId());
-            response.setProductId(itemProduct.getId());
-            response.setProductName(itemProduct.getName());
-            response.setPrice(itemProduct.getPrice());
-            response.setQuantity(item.getQuantity());
-            BigDecimal subtotal =
-                    itemProduct.getPrice()
-                            .multiply(
-                                    BigDecimal.valueOf(item.getQuantity())
-                            );
-
-            response.setSubtotal(subtotal);
-
-            itemResponses.add(response);
-
-        }
-        CartResponse cartResponse = new CartResponse();
-
-        cartResponse.setCartId(cart.getId());
-        cartResponse.setUserId(user.getId());
-        cartResponse.setItems(itemResponses);
-
-        return cartResponse;
+        return buildCartResponse(cart,user);
     }
 
+    @Transactional
     public CartResponse updateCartItem(Long cartItemId, UpdateCartItemRequest request){
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+        User user = getUser();
 
-        String username = authentication.getName();
-        User user = userRepo.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        Cart cart = getUserCart(user);
 
-        Cart cart = cartRepo.findByUserId(user.getId())
-                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
+        CartItem cartItem = cartItemRepo.findById(cartItemId)
+                .orElseThrow(() ->
+                        new CartItemNotFoundException("Cart item not found"));
 
-        List<CartItem> cartItems = cartItemRepo.findByCartId(cart.getId());
+        if (!cartItem.getCart().getId().equals(cart.getId())) {
+            throw new CartItemNotFoundException(
+                    "Cart item does not belong to your cart"
+            );
+        }
+        Product product = cartItem.getProduct();
+        int newQuantity = request.getQuantity();
+
+        if (newQuantity > product.getStockQuantity()) {
+            throw new InsufficientStockException(
+                    "Insufficient stock"
+            );
+        }
+
+        cartItem.setQuantity(newQuantity);
+        cartItemRepo.save(cartItem);
+
+        cart.setUpdatedAt(LocalDateTime.now());
+        cartRepo.save(cart);
+
+        return buildCartResponse(cart,user);
+    }
+
+    @Transactional
+    public CartResponse removeCartItem(Long cartItemId){
+        User user = getUser();
+
+        Cart cart = getUserCart(user);
+
+        CartItem cartItem = cartItemRepo.findById(cartItemId)
+                .orElseThrow(() ->
+                        new CartItemNotFoundException("Cart item not found"));
+
+        if (!cartItem.getCart().getId().equals(cart.getId())) {
+            throw new CartItemNotFoundException(
+                    "Cart item does not belong to your cart"
+            );
+        }
+
+        cartItemRepo.deleteById(cartItemId);
+
+        cart.setUpdatedAt(LocalDateTime.now());
+
+        cartRepo.save(cart);
+
+        return buildCartResponse(cart,user);
 
     }
 
+    @Transactional
+    public void clearCart(){
+        User user = getUser();
+
+        Cart cart = getUserCart(user);
+
+        cartItemRepo.deleteByCartId(cart.getId());
+
+        cart.setUpdatedAt(LocalDateTime.now());
+
+        cartRepo.save(cart);
+    }
 }
