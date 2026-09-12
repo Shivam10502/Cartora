@@ -80,6 +80,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleCartNotFound(CartNotFoundException ex,HttpServletRequest request){
         return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
+    @ExceptionHandler(CartIsEmptyException.class)
+    public ResponseEntity<ErrorResponse> handleCartIsEmpty(CartIsEmptyException ex,HttpServletRequest request){
+        return buildError(HttpStatus.NOT_FOUND,ex.getMessage(),request);
+    }
+
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleOrderNotFound(OrderNotFoundException ex,HttpServletRequest request){
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnAuthenticatedUser.class)
+    public ResponseEntity<ErrorResponse> handleUnAuthenticatedUser(UnAuthenticatedUser ex,HttpServletRequest request){
+        return buildError(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(OrderCancellationException.class)
+    public ResponseEntity<ErrorResponse> handleOrderCancellationException(OrderCancellationException ex,HttpServletRequest request){
+        return buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(

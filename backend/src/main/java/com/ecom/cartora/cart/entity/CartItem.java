@@ -1,4 +1,4 @@
-package com.ecom.cartora.cart;
+package com.ecom.cartora.cart.entity;
 
 import com.ecom.cartora.product.Product;
 import jakarta.persistence.*;

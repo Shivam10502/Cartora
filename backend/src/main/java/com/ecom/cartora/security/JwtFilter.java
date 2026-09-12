@@ -90,6 +90,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         } catch (JwtException | IllegalArgumentException ex) {
 
+            ex.printStackTrace();
             authenticationEntryPoint.commence(
                     request,
                     response,

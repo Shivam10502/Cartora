@@ -4,6 +4,8 @@ import com.ecom.cartora.cart.dto.AddToCartRequest;
 import com.ecom.cartora.cart.dto.CartItemResponse;
 import com.ecom.cartora.cart.dto.CartResponse;
 import com.ecom.cartora.cart.dto.UpdateCartItemRequest;
+import com.ecom.cartora.cart.entity.Cart;
+import com.ecom.cartora.cart.entity.CartItem;
 import com.ecom.cartora.exception.*;
 import com.ecom.cartora.product.Product;
 import com.ecom.cartora.product.ProductRepo;
@@ -75,16 +77,14 @@ public class CartService {
                 SecurityContextHolder.getContext().getAuthentication();
 
         String username = authentication.getName();
-        User user = userRepo.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        return user;
+        return userRepo.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
     private Cart getUserCart(User user){
-        Cart cart = cartRepo.findByUserId(user.getId())
-                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
 
-        return cart;
+        return cartRepo.findByUserId(user.getId())
+                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
     }
     @Transactional
     public CartResponse addProductToCart(AddToCartRequest request){

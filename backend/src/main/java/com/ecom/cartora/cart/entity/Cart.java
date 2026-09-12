@@ -1,5 +1,6 @@
-package com.ecom.cartora.user;
+package com.ecom.cartora.cart.entity;
 
+import com.ecom.cartora.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,34 +10,29 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "users",
+        name = "cart",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_user_email",
-                        columnNames = "email"
+                        name = "uk_cart_user",
+                        columnNames = "user_id"
                 )
         }
 )
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class Cart {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name;
-
-    @Column(nullable = false)
-    private String email;
-
-    @Column(nullable = false)
-    private String password;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
+    @OneToOne
+    @JoinColumn(
+            name = "user_id",
+            nullable = false
+    )
+    private User user;
 
     private LocalDateTime createdAt;
 
