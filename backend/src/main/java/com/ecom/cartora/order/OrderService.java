@@ -119,6 +119,7 @@ public class OrderService {
             throw new CartIsEmptyException("Cart Is Empty");
         }
 
+
         for (CartItem item : cartItems) {
 
             Product product = item.getProduct();
