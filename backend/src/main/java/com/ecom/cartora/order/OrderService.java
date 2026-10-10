@@ -1,7 +1,7 @@
 package com.ecom.cartora.order;
 
-import com.ecom.cartora.cart.CartItemRepo;
-import com.ecom.cartora.cart.CartRepo;
+import com.ecom.cartora.cart.repository.CartItemRepo;
+import com.ecom.cartora.cart.repository.CartRepo;
 import com.ecom.cartora.cart.entity.Cart;
 import com.ecom.cartora.cart.entity.CartItem;
 import com.ecom.cartora.exception.CartIsEmptyException;
@@ -102,7 +102,6 @@ public class OrderService {
         return response;
     }
 
-
     @Transactional
     public OrderResponse createOrder() {
 
@@ -120,11 +119,13 @@ public class OrderService {
         }
 
 
+        // Check stock before creating the order
         for (CartItem item : cartItems) {
 
             Product product = item.getProduct();
 
             if (item.getQuantity() > product.getStockQuantity()) {
+
                 throw new InsufficientStockException(
                         "Required quantity is not available for product: "
                                 + product.getName()
@@ -132,11 +133,30 @@ public class OrderService {
             }
         }
 
+
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+
+        // Calculate total first
+        for (CartItem item : cartItems) {
+
+            Product product = item.getProduct();
+
+            BigDecimal subtotal =
+                    product.getPrice()
+                            .multiply(
+                                    BigDecimal.valueOf(item.getQuantity())
+                            );
+
+            totalPrice = totalPrice.add(subtotal);
+        }
+
+
         Order order = new Order();
 
         order.setUser(user);
+        order.setTotalAmount(totalPrice);
         order.setStatus(OrderStatus.PENDING);
-        order.setTotalAmount(BigDecimal.ZERO);
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -145,8 +165,8 @@ public class OrderService {
 
         orderRepo.save(order);
 
-        BigDecimal totalPrice = BigDecimal.ZERO;
 
+        // Create order items as price snapshots
         for (CartItem item : cartItems) {
 
             Product product = item.getProduct();
@@ -168,22 +188,10 @@ public class OrderService {
 
             orderItem.setSubtotal(subtotal);
 
-            totalPrice = totalPrice.add(subtotal);
-
-            product.setStockQuantity(
-                    product.getStockQuantity()
-                            - item.getQuantity()
-            );
-
             orderItemRepo.save(orderItem);
         }
 
-        order.setTotalAmount(totalPrice);
-        order.setUpdatedAt(LocalDateTime.now());
 
-        orderRepo.save(order);
-
-        cartItemRepo.deleteByCartId(cart.getId());
 
         return buildOrderResponse(order);
     }

@@ -100,6 +100,16 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(UserOrderNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserOrderNotFoundException(UserOrderNotFoundException ex,HttpServletRequest request){
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PaymentCannotBeDone.class)
+    public ResponseEntity<ErrorResponse> handlePaymentCannotBeDone(PaymentCannotBeDone ex,HttpServletRequest request){
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex,

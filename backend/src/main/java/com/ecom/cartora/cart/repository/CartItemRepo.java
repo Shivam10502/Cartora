@@ -1,4 +1,4 @@
-package com.ecom.cartora.cart;
+package com.ecom.cartora.cart.repository;
 
 import com.ecom.cartora.cart.entity.CartItem;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,7 +1,7 @@
 package com.ecom.cartora.checkout;
 
-import com.ecom.cartora.cart.CartItemRepo;
-import com.ecom.cartora.cart.CartRepo;
+import com.ecom.cartora.cart.repository.CartItemRepo;
+import com.ecom.cartora.cart.repository.CartRepo;
 import com.ecom.cartora.cart.entity.Cart;
 import com.ecom.cartora.cart.entity.CartItem;
 import com.ecom.cartora.checkout.dto.CheckoutItemResponse;
