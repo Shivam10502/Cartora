@@ -63,7 +63,8 @@ class RazorpayPaymentServiceTest {
             cartRepo,
             cartItemRepo,
             refundService,
-            event -> { });
+            event -> {
+            });
 
     private User user;
     private Order order;
