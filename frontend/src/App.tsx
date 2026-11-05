@@ -1,12 +1,15 @@
-import { createContext, type FormEvent, startTransition, useCallback, useContext, useEffect, useState } from 'react'
-import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowDownUp, ArrowRight, Check, ChevronLeft, ChevronRight, Heart, LogOut, Search, ShoppingBag, Star, UserRound } from 'lucide-react'
-import { api, addCartItem, addWishlistItem, cancelOrder, clearCart, createAdminCoupon, createOrder, createProductReview, deleteProductReview, formatPrice, getAdminCoupons, getCart, getCategories, getErrorMessage, getOrder, getOrders, getProduct, getProductRating, getProductReviews, getProducts, getRecentlyViewedProducts, getWishlist, recordRecentlyViewed, removeCartItem, removeWishlistItem, setAdminCouponActive, updateCartItem, updateProductReview } from './api'
-import type { AdminCustomer, AdminDashboard, Cart, Category, Coupon, Order, PaymentRecord, Product, ProductPage, ProductRatingSummary, ProductReview, SalesPoint, User, WishlistItem } from './api'
+import { type FormEvent, startTransition, useCallback, useEffect, useState } from 'react'
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowRight, Check, ChevronLeft, ShoppingBag, Star } from 'lucide-react'
+import { api, cancelOrder, clearCart, createAdminCoupon, createOrder, createProductReview, deleteProductReview, formatPrice, getAdminCoupons, getCart, getCategories, getErrorMessage, getOrder, getOrders, getProduct, getProductRating, getProductReviews, getProducts, recordRecentlyViewed, removeCartItem, setAdminCouponActive, updateCartItem, updateProductReview } from './api'
+import type { AdminCustomer, AdminDashboard, Cart, Category, Coupon, Order, PaymentRecord, Product, ProductRatingSummary, ProductReview, SalesPoint, User } from './api'
 import './App.css'
 import './address.css'
+import { State, useApp } from './app-state'
+import { Browse, StoreLayout } from './storefront/Storefront'
+import { ProductPurchase, RelatedPieces, SavedPieces as WishlistPage } from './storefront/ProductDiscovery'
+import { productImage } from './storefront/shop-state'
 
-type AppState = { user: User | null; cart: Cart | null; refreshCart: () => Promise<void>; signIn: (email: string, password: string) => Promise<void>; signOut: () => void; updateUser: (user: User) => void }
 type RazorpayCheckoutResult = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }
 type RazorpayCheckoutOptions = {
   key: string
@@ -32,13 +35,6 @@ function loadRazorpayCheckout(): Promise<RazorpayCheckoutConstructor> {
     script.onerror = () => reject(new Error('Razorpay checkout could not be loaded.'))
     document.head.appendChild(script)
   })
-}
-
-const State = createContext<AppState | null>(null)
-const useApp = () => {
-  const value = useContext(State)
-  if (!value) throw new Error('App state is unavailable')
-  return value
 }
 
 export default function App() {
@@ -89,73 +85,8 @@ function RequireAuth({ admin = false }: { admin?: boolean }) {
   return <Outlet />
 }
 
-function StoreLayout() {
-  const { user, cart, signOut } = useApp()
-  const count = cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0
-  return <div className="app-shell"><div className="announcement">Thoughtful finds for everyday living <span>Complimentary delivery over ₹6,000</span></div>
-    <header className="topbar"><Link className="wordmark" to="/">cartora<span>.</span></Link><nav className="main-nav"><NavLink to="/">Shop</NavLink><NavLink to="/?sortBy=price&direction=asc">New in</NavLink><NavLink to="/orders">Orders</NavLink><NavLink to="/wishlist">Saved</NavLink>{user && <NavLink to="/addresses">Addresses</NavLink>}{user?.role === 'ADMIN' && <><NavLink to="/admin/overview">Studio</NavLink><NavLink to="/admin">Products</NavLink><NavLink to="/admin/categories">Categories</NavLink><NavLink to="/admin/orders">Order desk</NavLink><NavLink to="/admin/customers">Customers</NavLink><NavLink to="/admin/payments">Payments</NavLink><NavLink to="/admin/coupons">Coupons</NavLink></>}</nav>
-      <div className="nav-actions">{user ? <><Link className="icon-link" title="Account" to="/profile"><UserRound size={19} /><span className="nav-label">Account</span></Link><button className="icon-link" title="Sign out" onClick={signOut}><LogOut size={18} /><span className="nav-label">Sign out</span></button></> : <Link className="icon-link" to="/login"><UserRound size={19} /><span className="nav-label">Sign in</span></Link>}<Link className="bag-link" to="/cart" aria-label={`Cart, ${count} items`}><ShoppingBag size={19} /><span>{count}</span></Link></div>
-    </header><Outlet /><footer><Link className="wordmark" to="/">cartora<span>.</span></Link><span>Made for the things you keep.</span><span>Customer care · Shipping · Returns</span></footer></div>
-}
-
-function Browse() {
-  const { user } = useApp()
-  const [params, setParams] = useSearchParams()
-  const [page, setPage] = useState<ProductPage | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [recentProducts, setRecentProducts] = useState<Product[]>([])
-  const [error, setError] = useState('')
-  const search = params.get('search') ?? '', categoryId = params.get('categoryId') ?? ''
-  const minPrice = params.get('minPrice') ?? '', maxPrice = params.get('maxPrice') ?? ''
-  const sortBy = params.get('sortBy') ?? 'createdAt', direction = params.get('direction') ?? 'desc'
-  const pageNumber = Number(params.get('page') ?? 0)
-  useEffect(() => { getCategories().then(setCategories).catch(() => setCategories([])) }, [])
-  useEffect(() => { getProducts({ search: search || undefined, categoryId: categoryId || undefined, sortBy, direction, page: pageNumber, size: 12 }).then(setPage).catch((cause) => setError(getErrorMessage(cause))) }, [search, categoryId, sortBy, direction, pageNumber])
-  useEffect(() => {
-    let active = true
-    getRecentlyViewedProducts(Boolean(user))
-      .then((products) => { if (active) setRecentProducts(products) })
-      .catch(() => { if (active) setRecentProducts([]) })
-    return () => { active = false }
-  }, [user])
-  const update = (key: string, value: string) => { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); next.delete('page'); setParams(next) }
-  return <main><section className="hero-banner"><div className="hero-copy"><span className="eyebrow">OBJECTS WITH INTENTION</span><h1>Good things,<br /><em>kept close.</em></h1><p>Useful pieces, considered details, and a little joy in the everyday.</p><a className="primary-button" href="#catalog">Explore the collection <ArrowRight size={17} /></a></div><div className="hero-note"><span>01 / EDIT</span><b>Less, but<br />better.</b><small>Our current selection</small></div></section>
-    <section className="catalog" id="catalog"><div className="section-heading"><div><span className="eyebrow">THE CARTORA EDIT</span><h2>Find your next favorite.</h2></div><span className="result-count">{page?.totalElements ?? '...'} pieces</span></div>
-      <div className="toolbar"><DebouncedSearch key={search} value={search} /><select aria-label="Filter by category" value={categoryId} onChange={(event) => update('categoryId', event.target.value)}><option value="">All categories</option>{categories.map((category) => <option value={category.categoryId} key={category.categoryId}>{category.name}</option>)}</select><label className="price-filter">From<input aria-label="Minimum price" type="number" min="0" step="0.01" value={minPrice} onChange={(event) => update('minPrice', event.target.value)} placeholder="Min ₹" /></label><label className="price-filter">To<input aria-label="Maximum price" type="number" min="0" step="0.01" value={maxPrice} onChange={(event) => update('maxPrice', event.target.value)} placeholder="Max ₹" /></label><label className="sort-box"><ArrowDownUp size={16} /><select aria-label="Sort products" value={`${sortBy}:${direction}`} onChange={(event) => { const [field, order] = event.target.value.split(':'); update('sortBy', field); update('direction', order) }}><option value="createdAt:desc">Recently added</option><option value="price:asc">Price: low to high</option><option value="price:desc">Price: high to low</option><option value="name:asc">Name: A to Z</option></select></label></div>
-      {error && <p className="notice error">{error}</p>}{page?.content.length ? <div className="product-grid">{page.content.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}</div> : <div className="empty-state"><ShoppingBag size={28} /><h3>{page ? 'No pieces found' : error ? 'The collection is unavailable' : 'Loading the collection'}</h3><p>{page ? 'Try another search or category.' : error ? 'The Cartora API could not be reached. Please try again shortly.' : 'Connecting to the Cartora collection.'}</p></div>}
-      {page && page.totalPages > 1 && <div className="pagination"><button disabled={page.first} onClick={() => update('page', String(pageNumber - 1))}><ChevronLeft size={17} /> Previous</button><span>Page {page.page + 1} of {page.totalPages}</span><button disabled={page.last} onClick={() => update('page', String(pageNumber + 1))}>Next <ChevronRight size={17} /></button></div>}</section>{recentProducts.length > 0 && <section className="recent-section"><div className="section-heading"><div><span className="eyebrow">A LITTLE LOOK BACK</span><h2>Recently viewed.</h2></div></div><div className="product-grid">{recentProducts.map((recentProduct, index) => <ProductCard key={recentProduct.id} product={recentProduct} index={index} />)}</div></section>}</main>
-}
-
-function DebouncedSearch({ value }: { value: string }) {
-  const [params, setParams] = useSearchParams()
-  const [text, setText] = useState(value)
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (text.trim() === value) return
-      const next = new URLSearchParams(params)
-      if (text.trim()) next.set('search', text.trim())
-      else next.delete('search')
-      next.delete('page')
-      setParams(next)
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [text, value, params, setParams])
-  return <label className="search-box"><Search size={17} /><input value={text} onChange={(event) => setText(event.target.value)} placeholder="Search the collection" /></label>
-}
-
-const productPhotos = ['photo-1494438639946-1ebd1d20bf85', 'photo-1503602642458-232111445657', 'photo-1523275335684-37898b6baf30', 'photo-1526170375885-4d8ecf77b99f']
-function ProductCard({ product, index }: { product: Product; index: number }) {
-  const { user, refreshCart } = useApp(); const [message, setMessage] = useState('')
-  const location = useLocation(), navigate = useNavigate()
-  const requestSignIn = () => navigate('/login', { state: { from: location } })
-  const add = async () => { if (!user) { requestSignIn(); return }; try { await addCartItem(product.id); await refreshCart(); setMessage('Added') } catch (error) { setMessage(getErrorMessage(error)) } }
-  const save = async () => { if (!user) { requestSignIn(); return }; try { await addWishlistItem(product.id); setMessage('Saved') } catch (error) { setMessage(getErrorMessage(error)) } }
-  return <article className="product-card"><Link to={`/product/${product.id}`} className="product-image"><img src={product.imageUrl || `https://images.unsplash.com/${productPhotos[index % 4]}?auto=format&fit=crop&w=800&q=80`} alt={product.name} /><span className="image-index">0{index % 4 + 1}</span></Link><button className="wishlist-toggle" title="Save to wishlist" aria-label={`Save ${product.name} to wishlist`} onClick={() => void save()}><Heart size={17} /></button><div className="product-meta"><Link to={`/product/${product.id}`}><h3>{product.name}</h3></Link><span>{formatPrice(Number(product.price))}</span></div><div className="product-sub"><span>{product.stockQuantity > 0 ? 'In stock' : 'Sold out'}</span><button disabled={!product.stockQuantity} onClick={add}>{message || 'Add to bag'} <ArrowRight size={14} /></button></div></article>
-}
-
 function ProductDetails() {
-  const { id } = useParams(), { user, refreshCart } = useApp()
-  const location = useLocation(), navigate = useNavigate()
+  const { id } = useParams(), { user } = useApp()
   const [product, setProduct] = useState<Product | null>(null), [message, setMessage] = useState('')
   const [reviews, setReviews] = useState<ProductReview[]>([]), [rating, setRating] = useState<ProductRatingSummary | null>(null), [reviewMessage, setReviewMessage] = useState('')
   const loadReviews = async (productId: number) => {
@@ -171,7 +102,6 @@ function ProductDetails() {
     getProduct(productId).then((result) => { recordRecentlyViewed(productId); startTransition(() => setProduct(result)) }).catch((error) => setMessage(getErrorMessage(error)))
     loadReviews(productId).catch((error) => setReviewMessage(getErrorMessage(error)))
   }, [id])
-  const add = async () => { if (!user) { navigate('/login', { state: { from: location } }); return }; if (product) try { await addCartItem(product.id); await refreshCart(); setMessage('Added to your bag') } catch (error) { setMessage(getErrorMessage(error)) } }
   const submitReview = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!product) return
@@ -192,7 +122,7 @@ function ProductDetails() {
   }
   if (!product) return <main className="content-page"><p>{message || 'Loading product...'}</p></main>
   const ownReview = reviews.find((review) => review.userId === user?.id)
-  return <main className="content-page"><section className="detail-layout"><div className="detail-photo"><img src={product.imageUrl || `https://images.unsplash.com/${productPhotos[product.id % 4]}?auto=format&fit=crop&w=1200&q=85`} alt={product.name} /></div><div className="detail-info"><span className="eyebrow">THE CARTORA EDIT</span><h1>{product.name}</h1><div className="rating-summary"><span>{rating ? Number(rating.averageRating).toFixed(2) : '—'}</span><Star size={15} fill="currentColor" /><small>{rating?.reviewCount ?? 0} reviews</small></div><strong>{formatPrice(Number(product.price))}</strong><p>{product.description}</p><p className="stock-line">{product.stockQuantity > 0 ? `${product.stockQuantity} available` : 'Currently unavailable'}</p><button className="primary-button" disabled={!product.stockQuantity} onClick={add}>Add to bag <ArrowRight size={17} /></button>{message && <p className="notice">{message}</p>}</div></section><section className="reviews-section"><div className="section-heading"><div><span className="eyebrow">CUSTOMER NOTES</span><h2>Reviews.</h2></div><span>{rating?.reviewCount ?? 0} reviews</span></div>{reviewMessage && <p className="notice">{reviewMessage}</p>}{reviews.length ? <div className="review-list">{reviews.map((review) => <article className="review-card" key={review.id}><div className="review-heading"><div>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={14} fill={index < review.rating ? 'currentColor' : 'none'} />)}</div><time>{new Date(review.createdAt).toLocaleDateString()}</time></div><h3>{review.title}</h3><p>{review.comment}</p><small>{review.reviewerName}{review.userId === user?.id ? ' · Your review' : ''}</small></article>)}</div> : <p className="review-empty">No reviews yet.</p>}{user && <form className="review-form" onSubmit={submitReview}><h3>{ownReview ? 'Update your review' : 'Reviewed this purchase?'}</h3><p>Reviews are available to customers with a confirmed or fulfilled order.</p><div className="review-fields"><label>Rating<select name="rating" defaultValue={ownReview?.rating ?? 5}><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select></label><label>Title<input name="title" maxLength={80} defaultValue={ownReview?.title} required /></label></div><label>Review<textarea name="comment" maxLength={1000} defaultValue={ownReview?.comment} required /></label><div className="review-actions"><button className="primary-button">{ownReview ? 'Update review' : 'Submit review'} <ArrowRight size={16} /></button>{ownReview && <button className="text-button" type="button" onClick={() => void removeReview()}>Delete review</button>}</div></form>}</section></main>
+  return <main className="content-page"><Link className="detail-breadcrumb" to="/#catalog"><ChevronLeft size={15} /> Back to the collection</Link><section className="detail-layout"><div className="detail-photo"><img src={productImage(product)} alt={product.name} /></div><div className="detail-info"><span className="eyebrow">THE CARTORA EDIT</span><h1>{product.name}</h1><div className="rating-summary"><span>{rating ? Number(rating.averageRating).toFixed(2) : '—'}</span><Star size={15} fill="currentColor" /><small>{rating?.reviewCount ?? 0} reviews</small></div><strong>{formatPrice(Number(product.price))}</strong><p>{product.description}</p><p className="stock-line">{product.stockQuantity > 0 ? `${product.stockQuantity} available` : 'Currently unavailable'}</p><ProductPurchase key={product.id} product={product} />{message && <p className="notice">{message}</p>}</div></section><section className="reviews-section"><div className="section-heading"><div><span className="eyebrow">CUSTOMER NOTES</span><h2>Reviews.</h2></div><span>{rating?.reviewCount ?? 0} reviews</span></div>{reviewMessage && <p className="notice">{reviewMessage}</p>}{reviews.length ? <div className="review-list">{reviews.map((review) => <article className="review-card" key={review.id}><div className="review-heading"><div>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={14} fill={index < review.rating ? 'currentColor' : 'none'} />)}</div><time>{new Date(review.createdAt).toLocaleDateString()}</time></div><h3>{review.title}</h3><p>{review.comment}</p><small>{review.reviewerName}{review.userId === user?.id ? ' · Your review' : ''}</small></article>)}</div> : <p className="review-empty">No reviews yet.</p>}{user && <form className="review-form" onSubmit={submitReview}><h3>{ownReview ? 'Update your review' : 'Reviewed this purchase?'}</h3><p>Reviews are available to customers with a confirmed or fulfilled order.</p><div className="review-fields"><label>Rating<select name="rating" defaultValue={ownReview?.rating ?? 5}><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select></label><label>Title<input name="title" maxLength={80} defaultValue={ownReview?.title} required /></label></div><label>Review<textarea name="comment" maxLength={1000} defaultValue={ownReview?.comment} required /></label><div className="review-actions"><button className="primary-button">{ownReview ? 'Update review' : 'Submit review'} <ArrowRight size={16} /></button>{ownReview && <button className="text-button" type="button" onClick={() => void removeReview()}>Delete review</button>}</div></form>}</section><RelatedPieces product={product} /></main>
 }
 
 function AuthPage({ register = false }: { register?: boolean }) {
@@ -435,17 +365,6 @@ function ProfilePage() {
 }
 
 type SavedAddress = AddressForm & { id: number; defaultAddress: boolean }
-function WishlistPage() {
-  const { user, refreshCart } = useApp()
-  const [items, setItems] = useState<WishlistItem[]>([])
-  const [error, setError] = useState('')
-  useEffect(() => { if (user) getWishlist().then(setItems).catch((cause) => setError(getErrorMessage(cause))) }, [user])
-  if (!user) return <SignInPrompt />
-  const remove = async (productId: number) => { try { await removeWishlistItem(productId); setItems((current) => current.filter((item) => item.productId !== productId)) } catch (cause) { setError(getErrorMessage(cause)) } }
-  const addToBag = async (productId: number) => { try { await addCartItem(productId); await refreshCart() } catch (cause) { setError(getErrorMessage(cause)) } }
-  return <main className="content-page"><span className="eyebrow">YOUR CARTORA EDIT</span><h1>Saved for later.</h1>{error && <p className="notice error">{error}</p>}{items.length ? <div className="product-grid">{items.map((item, index) => <article className="product-card" key={item.productId}><div className="product-image"><img src={`https://images.unsplash.com/${productPhotos[index % 4]}?auto=format&fit=crop&w=800&q=80`} alt="" /></div><button className="wishlist-toggle" title="Remove from wishlist" aria-label={`Remove ${item.productName} from wishlist`} onClick={() => void remove(item.productId)}><Heart size={17} fill="currentColor" /></button><div className="product-meta"><h3>{item.productName}</h3><span>{formatPrice(Number(item.price))}</span></div><div className="product-sub"><span>{item.stockQuantity > 0 ? 'In stock' : 'Sold out'}</span><button disabled={!item.stockQuantity} onClick={() => void addToBag(item.productId)}>Add to bag <ArrowRight size={14} /></button></div></article>)}</div> : !error && <div className="empty-state"><Heart size={26} /><h3>Your saved edit starts here.</h3><Link className="text-link" to="/">Browse the collection <ArrowRight size={15} /></Link></div>}</main>
-}
-
 function AddressesPage() {
   const { user } = useApp()
   const [addresses, setAddresses] = useState<SavedAddress[]>([])

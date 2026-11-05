@@ -20,6 +20,9 @@ Implemented in the repository:
 - Customer wishlist
 - Verified-purchase product reviews and aggregate ratings
 - Recently viewed products persisted per account (guest history stays in the browser and merges after sign-in)
+- Photo-led, responsive storefront with category collections, search, price presets, and grid/list browsing
+- Product quick views with quantity selection, a slide-out shopping bag, and comparison of up to three products (comparison persists in the browser)
+- Product pages with related pieces, shared wishlist actions, loading states, and accessible shopping dialogs
 - Admin order listing with guarded shipped/delivered status transitions
 - Admin coupon creation/activation and validated checkout discounts
 - Admin customer list, payment management, refunds, store metrics, and daily sales reporting
@@ -126,6 +129,14 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:5173/>. Vite proxies `/api` requests to `http://localhost:8080`. For another API host, set `VITE_API_BASE_URL` in the frontend environment.
+
+For an empty local development database, `backend/scripts/seed-demo-catalog.sql` adds four categories and twelve sample products. It is optional, is not part of the Flyway migrations, and leaves existing category names and product SKUs unchanged. Run it explicitly using your PostgreSQL client:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5432 -U postgres -d cartora -W -v ON_ERROR_STOP=1 -f backend/scripts/seed-demo-catalog.sql
+```
+
+Run that command from the repository root. The bundled sample photography is served from `frontend/public/images`; replace the sample inventory with your own product information for a real store.
 
 ## Tests and Quality Checks
 

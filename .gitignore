@@ -19,6 +19,8 @@ backend/.mvn/wrapper/maven-wrapper.jar
 frontend/node_modules/
 frontend/dist/
 frontend/build/
+frontend/test-results/
+frontend/playwright-report/
 
 # =========================
 # Environment / Secrets
