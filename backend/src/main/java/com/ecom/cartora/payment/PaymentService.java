@@ -9,19 +9,24 @@ import com.ecom.cartora.exception.OrderNotFoundException;
 import com.ecom.cartora.exception.PaymentCannotBeDone;
 import com.ecom.cartora.exception.UserOrderNotFoundException;
 import com.ecom.cartora.order.entity.Order;
+import com.ecom.cartora.order.OrderPaidEvent;
 import com.ecom.cartora.order.entity.OrderStatus;
 import com.ecom.cartora.order.entity.OrderItem;
 import com.ecom.cartora.order.repository.OrderItemRepo;
 import com.ecom.cartora.order.repository.OrderRepo;
 import com.ecom.cartora.payment.dto.PaymentRequest;
 import com.ecom.cartora.payment.dto.PaymentResponse;
+import com.ecom.cartora.payment.SimulatedPaymentProcessor;
 import com.ecom.cartora.payment.entity.Payment;
 import com.ecom.cartora.payment.entity.PaymentMethod;
 import com.ecom.cartora.payment.entity.PaymentStatus;
 import com.ecom.cartora.product.Product;
+import com.ecom.cartora.product.ProductRepo;
+import com.ecom.cartora.product.ProductInventoryService;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -30,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -54,25 +61,24 @@ public class PaymentService {
     @Autowired
     private CartItemRepo cartItemRepo;
 
+    @Autowired
+    private SimulatedPaymentProcessor simulatedPaymentProcessor;
+
+    @Autowired
+    private ProductInventoryService productInventoryService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     private User getUser() {
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         String username = authentication.getName();
 
         return userRepo.findByEmail(username)
-                .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
-
-
-    private boolean simulatePayment(PaymentMethod method) {
-
-        return Math.random() < 0.8;
-    }
-
 
     private PaymentResponse buildPaymentResponse(Payment payment) {
 
@@ -85,72 +91,67 @@ public class PaymentService {
         response.setPaymentMethod(payment.getPaymentMethod());
         response.setTransactionId(payment.getTransactionId());
         response.setCreatedAt(payment.getCreatedAt());
+        response.setProviderOrderId(payment.getProviderOrderId());
+        response.setProviderPaymentId(payment.getProviderPaymentId());
+        response.setFailureReason(payment.getFailureReason());
 
         return response;
     }
-
 
     @Transactional
     public PaymentResponse makePayment(PaymentRequest request) {
 
         User user = getUser();
 
-        Order order = orderRepo.findById(request.getOrderId())
-                .orElseThrow(() ->
-                        new OrderNotFoundException("Order Doesn't Exist"));
-
+        Order order = orderRepo.findByIdForUpdate(request.getOrderId())
+                .orElseThrow(() -> new OrderNotFoundException("Order Doesn't Exist"));
 
         // Verify order ownership
         if (!user.getId().equals(order.getUser().getId())) {
 
             throw new UserOrderNotFoundException(
-                    "Order does not belong to the authenticated user"
-            );
+                    "Order does not belong to the authenticated user");
         }
-
 
         // Only PENDING orders can be paid
         if (order.getStatus() != OrderStatus.PENDING) {
 
             throw new PaymentCannotBeDone(
                     "Order is " + order.getStatus()
-                            + ", so payment can't be done"
-            );
+                            + ", so payment can't be done");
         }
-
 
         /*
          * Check whether a payment already exists.
          *
-         * SUCCESS  -> cannot pay again
-         * PENDING  -> payment already in progress
-         * FAILED   -> retry is allowed
+         * SUCCESS -> cannot pay again
+         * PENDING -> payment already in progress
+         * FAILED -> retry is allowed
          */
         Payment payment = paymentRepo.findByOrderId(order.getId())
                 .orElse(null);
-
 
         if (payment != null) {
 
             if (payment.getStatus() == PaymentStatus.SUCCESS) {
 
                 throw new PaymentCannotBeDone(
-                        "Payment has already been completed for this order"
-                );
+                        "Payment has already been completed for this order");
             }
 
             if (payment.getStatus() == PaymentStatus.PENDING) {
 
                 throw new PaymentCannotBeDone(
-                        "Payment is already in progress for this order"
-                );
+                        "Payment is already in progress for this order");
+            }
+
+            if (payment.getStatus() != PaymentStatus.FAILED) {
+                throw new PaymentCannotBeDone("This payment cannot be retried in its current state");
             }
         }
 
-
         // Amount always comes from the Order
         BigDecimal amount = order.getTotalAmount();
-
 
         /*
          * If previous payment FAILED,
@@ -164,8 +165,10 @@ public class PaymentService {
 
             payment.setOrder(order);
             payment.setCreatedAt(LocalDateTime.now());
+            payment.setAttemptNumber(1);
+        } else {
+            payment.setAttemptNumber(payment.getAttemptNumber() + 1);
         }
-
 
         payment.setAmount(amount);
         payment.setStatus(PaymentStatus.PENDING);
@@ -175,60 +178,41 @@ public class PaymentService {
 
         paymentRepo.save(payment);
 
-
         // Simulate payment gateway
-        boolean paymentSuccessful =
-                simulatePayment(request.getPaymentMethod());
-
+        boolean paymentSuccessful = simulatedPaymentProcessor.process(request.getPaymentMethod());
 
         if (paymentSuccessful) {
 
-            /*
-             * Before confirming payment,
-             * verify stock again.
-             */
-            List<OrderItem> orderItems =
-                    orderItemRepo.findByOrderId(order.getId());
+            List<OrderItem> orderItems = orderItemRepo.findByOrderId(order.getId());
+            if (!order.isInventoryReserved()) {
+                // Support pending orders created before inventory reservations were
+                // introduced. New orders already deducted stock at order creation.
+                Map<Long, Product> lockedProducts = productInventoryService.lockAndRefresh(orderItems.stream()
+                        .map(item -> item.getProduct().getId()).toList());
 
+                for (OrderItem orderItem : orderItems) {
+                    Product product = lockedProducts.get(orderItem.getProduct().getId());
+                    if (orderItem.getQuantity() > product.getStockQuantity()) {
+                        payment.setStatus(PaymentStatus.FAILED);
+                        payment.setUpdatedAt(LocalDateTime.now());
+                        paymentRepo.save(payment);
+                        return buildPaymentResponse(payment);
+                    }
+                }
 
-            for (OrderItem orderItem : orderItems) {
-
-                Product product = orderItem.getProduct();
-
-                if (orderItem.getQuantity() >
-                        product.getStockQuantity()) {
-
-                    payment.setStatus(PaymentStatus.FAILED);
-                    payment.setUpdatedAt(LocalDateTime.now());
-
-                    paymentRepo.save(payment);
-
-                    throw new InsufficientStockException(
-                            "Insufficient stock for product: "
-                                    + product.getName()
-                    );
+                for (OrderItem orderItem : orderItems) {
+                    Product product = lockedProducts.get(orderItem.getProduct().getId());
+                    product.setStockQuantity(product.getStockQuantity() - orderItem.getQuantity());
                 }
             }
 
-
-            // Deduct stock
-            for (OrderItem orderItem : orderItems) {
-
-                Product product = orderItem.getProduct();
-
-                product.setStockQuantity(
-                        product.getStockQuantity()
-                                - orderItem.getQuantity()
-                );
-            }
-
-
             // Payment successful
             payment.setStatus(PaymentStatus.SUCCESS);
+            order.setInventoryReserved(false);
 
             order.setStatus(OrderStatus.CONFIRMED);
             order.setUpdatedAt(LocalDateTime.now());
-
+            eventPublisher.publishEvent(new OrderPaidEvent(user.getEmail(), user.getName(), order.getId(), amount));
 
             // Clear cart
             Cart cart = cartRepo.findByUserId(user.getId())
@@ -248,7 +232,6 @@ public class PaymentService {
             // Payment failed
             payment.setStatus(PaymentStatus.FAILED);
         }
-
 
         payment.setUpdatedAt(LocalDateTime.now());
 

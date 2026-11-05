@@ -19,7 +19,10 @@ public class UserRegisterRequest {
     @Size(max = 50, message = "Email cannot exceed 50 characters")
     private String email;
     @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
+    @Size(min = 8, max = 72, message = "Password must be between 8 and 72 characters")
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s])\\S+$",
+            message = "Password must contain uppercase, lowercase, a digit and a special character, with no whitespace")
     private String password;
 
 }

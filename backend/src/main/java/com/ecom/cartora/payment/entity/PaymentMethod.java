@@ -4,5 +4,6 @@ public enum PaymentMethod {
     CARD,
     UPI,
     NET_BANKING,
-    COD
+    COD,
+    RAZORPAY
 }

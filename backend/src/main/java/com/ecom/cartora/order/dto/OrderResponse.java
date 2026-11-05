@@ -1,5 +1,6 @@
 package com.ecom.cartora.order.dto;
 
+import com.ecom.cartora.checkout.dto.ShippingAddressRequest;
 import com.ecom.cartora.order.entity.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,4 +19,7 @@ public class OrderResponse {
     private OrderStatus status;
     private List<OrderItemResponse> orderItems;
     private LocalDateTime createdAt;
+    private BigDecimal discountAmount;
+    private String couponCode;
+    private ShippingAddressRequest shippingAddress;
 }

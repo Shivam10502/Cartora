@@ -50,6 +50,18 @@ public class Payment {
     @Column(nullable = false)
     private String transactionId;
 
+    @Column(unique = true)
+    private String providerPaymentId;
+
+    @Column
+    private String providerOrderId;
+
+    @Column(length = 500)
+    private String failureReason;
+
+    @Column(nullable = false)
+    private int attemptNumber = 1;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

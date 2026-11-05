@@ -80,6 +80,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleCartNotFound(CartNotFoundException ex,HttpServletRequest request){
         return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
+
+    @ExceptionHandler(CartItemNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCartItemNotFound(
+            CartItemNotFoundException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
     @ExceptionHandler(CartIsEmptyException.class)
     public ResponseEntity<ErrorResponse> handleCartIsEmpty(CartIsEmptyException ex,HttpServletRequest request){
         return buildError(HttpStatus.NOT_FOUND,ex.getMessage(),request);

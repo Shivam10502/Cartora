@@ -14,90 +14,86 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtService jwtService;
+        private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
-    @Autowired
-    private UserDetailsService userDetailsService;
+        @Autowired
+        private JwtService jwtService;
 
-    @Autowired
-    private CustomAuthenticationEntryPoint authenticationEntryPoint;
+        @Autowired
+        private UserDetailsService userDetailsService;
 
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
+        @Autowired
+        private CustomAuthenticationEntryPoint authenticationEntryPoint;
 
-        String authHeader =
-                request.getHeader("Authorization");
+        @Override
+        protected void doFilterInternal(
+                        HttpServletRequest request,
+                        HttpServletResponse response,
+                        FilterChain filterChain)
+                        throws ServletException, IOException {
 
-        String token = null;
-        String email = null;
+                String authHeader = request.getHeader("Authorization");
 
-        try {
+                String token = null;
+                String email = null;
 
-            if (authHeader != null &&
-                    authHeader.startsWith("Bearer ")) {
+                try {
 
-                token = authHeader.substring(7);
+                        if (authHeader != null &&
+                                        authHeader.startsWith("Bearer ")) {
 
-                email = jwtService.extractUsername(token);
-            }
+                                token = authHeader.substring(7);
 
-            if (email != null &&
-                    SecurityContextHolder
-                            .getContext()
-                            .getAuthentication() == null) {
+                                email = jwtService.extractUsername(token);
+                        }
 
-                UserDetails userDetails =
-                        userDetailsService
-                                .loadUserByUsername(email);
+                        if (email != null &&
+                                        SecurityContextHolder
+                                                        .getContext()
+                                                        .getAuthentication() == null) {
 
-                if (jwtService.isTokenValid(
-                        token,
-                        userDetails)) {
+                                UserDetails userDetails = userDetailsService
+                                                .loadUserByUsername(email);
 
-                    UsernamePasswordAuthenticationToken
-                            authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+                                if (jwtService.isTokenValid(
+                                                token,
+                                                userDetails)) {
 
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource()
-                                    .buildDetails(request)
-                    );
+                                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                                        userDetails,
+                                                        null,
+                                                        userDetails.getAuthorities());
 
-                    SecurityContextHolder
-                            .getContext()
-                            .setAuthentication(
-                                    authentication
-                            );
+                                        authentication.setDetails(
+                                                        new WebAuthenticationDetailsSource()
+                                                                        .buildDetails(request));
+
+                                        SecurityContextHolder
+                                                        .getContext()
+                                                        .setAuthentication(
+                                                                        authentication);
+                                }
+                        }
+
+                        filterChain.doFilter(request, response);
+
+                } catch (JwtException | IllegalArgumentException ex) {
+
+                        logger.warn("Rejected invalid JWT for request path {}",
+                                        request.getRequestURI());
+                        authenticationEntryPoint.commence(
+                                        request,
+                                        response,
+                                        new BadCredentialsException(
+                                                        "Invalid or expired JWT"));
                 }
-            }
-
-            filterChain.doFilter(request, response);
-
-        } catch (JwtException | IllegalArgumentException ex) {
-
-            ex.printStackTrace();
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException(
-                            "Invalid or expired JWT"
-                    )
-            );
         }
-    }
 }

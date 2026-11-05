@@ -10,6 +10,10 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 
@@ -21,7 +25,15 @@ public class ProductController {
     @Autowired
     private ProductService service;
 
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ProductResponse uploadProductImage(@PathVariable("id") Long id,
+            @RequestParam("file") MultipartFile file) {
+        return service.updateProductImage(id, file);
+    }
+
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse addProduct(
             @Valid @RequestBody ProductRequest request) {
@@ -31,7 +43,7 @@ public class ProductController {
 
     @GetMapping("/{id}")
     public ProductResponse getProduct(
-            @PathVariable Long id) {
+            @PathVariable("id") Long id) {
 
         return service.getProductById(id);
     }
@@ -77,7 +89,7 @@ public class ProductController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse updateProduct(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody ProductRequest request) {
 
         return service.updateProduct(id, request);
@@ -85,7 +97,8 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public void deleteProduct(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProduct(@PathVariable("id") Long id) {
         service.deleteProduct(id);
+        return ResponseEntity.noContent().build();
     }
 }

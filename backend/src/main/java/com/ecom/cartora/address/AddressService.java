@@ -2,7 +2,6 @@ package com.ecom.cartora.address;
 
 import com.ecom.cartora.address.dto.AddressRequest;
 import com.ecom.cartora.address.dto.AddressResponse;
-import com.ecom.cartora.exception.UserOrderNotFoundException;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +45,17 @@ public class AddressService {
         return userRepo.findByEmail(email)
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found"));
+    }
+
+    private User getAuthenticatedUserForUpdate() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is required");
+        }
+        return userRepo.findByEmailIgnoreCaseForUpdate(authentication.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
     private Address getOwnedAddress(Long addressId, Long userId) {
@@ -102,7 +112,7 @@ public class AddressService {
     @Transactional
     public AddressResponse createAddress(AddressRequest request) {
 
-        User user = getAuthenticatedUser();
+        User user = getAuthenticatedUserForUpdate();
 
         List<Address> existingAddresses =
                 addressRepo.findByUserIdOrderByCreatedAtAsc(user.getId());
@@ -155,7 +165,7 @@ public class AddressService {
             Long addressId,
             AddressRequest request) {
 
-        User user = getAuthenticatedUser();
+        User user = getAuthenticatedUserForUpdate();
 
         Address address = getOwnedAddress(addressId, user.getId());
 
@@ -171,13 +181,14 @@ public class AddressService {
     @Transactional
     public void deleteAddress(Long addressId) {
 
-        User user = getAuthenticatedUser();
+        User user = getAuthenticatedUserForUpdate();
 
         Address address = getOwnedAddress(addressId, user.getId());
 
         boolean wasDefault = address.isDefaultAddress();
 
         addressRepo.delete(address);
+        addressRepo.flush();
 
         if (wasDefault) {
 
@@ -200,7 +211,7 @@ public class AddressService {
     @Transactional
     public AddressResponse setDefaultAddress(Long addressId) {
 
-        User user = getAuthenticatedUser();
+        User user = getAuthenticatedUserForUpdate();
 
         Address selectedAddress =
                 getOwnedAddress(addressId, user.getId());
@@ -219,11 +230,13 @@ public class AddressService {
             }
         }
 
+        // Flush the previous default=false values before enabling the partial unique index.
+        addressRepo.saveAllAndFlush(addresses);
+
         // Set the selected address as the only default.
         selectedAddress.setDefaultAddress(true);
         selectedAddress.setUpdatedAt(now);
-
-        addressRepo.saveAll(addresses);
+        addressRepo.saveAndFlush(selectedAddress);
 
         return toResponse(selectedAddress);
     }

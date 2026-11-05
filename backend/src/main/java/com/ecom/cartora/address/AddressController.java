@@ -38,7 +38,7 @@ public class AddressController {
     // GET /api/addresses/{id}
     @GetMapping("/{id}")
     public AddressResponse getAddressById(
-            @PathVariable Long id) {
+            @PathVariable("id") Long id) {
 
         return addressService.getAddressById(id);
     }
@@ -46,7 +46,7 @@ public class AddressController {
     // PUT /api/addresses/{id}
     @PutMapping("/{id}")
     public AddressResponse updateAddress(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody AddressRequest request) {
 
         return addressService.updateAddress(id, request);
@@ -55,7 +55,7 @@ public class AddressController {
     // DELETE /api/addresses/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAddress(
-            @PathVariable Long id) {
+            @PathVariable("id") Long id) {
 
         addressService.deleteAddress(id);
 
@@ -65,7 +65,7 @@ public class AddressController {
     // PATCH /api/addresses/{id}/default
     @PatchMapping("/{id}/default")
     public AddressResponse setDefaultAddress(
-            @PathVariable Long id) {
+            @PathVariable("id") Long id) {
 
         return addressService.setDefaultAddress(id);
     }

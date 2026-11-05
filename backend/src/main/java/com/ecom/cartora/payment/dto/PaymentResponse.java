@@ -20,4 +20,7 @@ public class PaymentResponse {
     private PaymentMethod paymentMethod;
     private String transactionId;
     private LocalDateTime createdAt;
+    private String providerOrderId;
+    private String providerPaymentId;
+    private String failureReason;
 }

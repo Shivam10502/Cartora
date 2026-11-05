@@ -26,14 +26,15 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
 
+        String email = request.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
+                        email,
                         request.getPassword()
                 )
         );
 
-        User user = userRepo.findByEmail(request.getEmail())
+        User user = userRepo.findByEmailIgnoreCase(email)
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found"));
 

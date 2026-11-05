@@ -88,12 +88,16 @@ public class CartService {
         return cartRepo.findByUserId(user.getId())
                 .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
     }
+    private Cart getUserCartForUpdate(User user){
+        return cartRepo.findByUserIdForUpdate(user.getId())
+                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
+    }
     @Transactional
     public CartResponse addProductToCart(AddToCartRequest request){
 
         User user = getUser();
 
-        Cart cart = cartRepo.findByUserId(user.getId())
+        Cart cart = cartRepo.findByUserIdForUpdate(user.getId())
                 .orElseGet(() -> {
                     Cart newCart = new Cart();
                     newCart.setUser(user);
@@ -157,7 +161,7 @@ public class CartService {
     public CartResponse updateCartItem(Long cartItemId, UpdateCartItemRequest request){
         User user = getUser();
 
-        Cart cart = getUserCart(user);
+        Cart cart = getUserCartForUpdate(user);
 
         CartItem cartItem = cartItemRepo.findById(cartItemId)
                 .orElseThrow(() ->
@@ -190,7 +194,7 @@ public class CartService {
     public CartResponse removeCartItem(Long cartItemId){
         User user = getUser();
 
-        Cart cart = getUserCart(user);
+        Cart cart = getUserCartForUpdate(user);
 
         CartItem cartItem = cartItemRepo.findById(cartItemId)
                 .orElseThrow(() ->

@@ -26,12 +26,12 @@ public class CartController {
     }
 
     @PutMapping("/items/{cartItemId}")
-    public CartResponse updateCart(@PathVariable Long cartItemId, @Valid @RequestBody UpdateCartItemRequest request){
+    public CartResponse updateCart(@PathVariable("cartItemId") Long cartItemId, @Valid @RequestBody UpdateCartItemRequest request){
         return cartService.updateCartItem(cartItemId,request);
     }
 
     @DeleteMapping("/items/{cartItemId}")
-    public CartResponse removeOneCartItem(@PathVariable Long cartItemId){
+    public CartResponse removeOneCartItem(@PathVariable("cartItemId") Long cartItemId){
         return cartService.removeCartItem(cartItemId);
     }
 

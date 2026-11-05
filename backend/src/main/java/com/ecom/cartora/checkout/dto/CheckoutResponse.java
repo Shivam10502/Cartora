@@ -15,6 +15,9 @@ public class CheckoutResponse {
 
     private ShippingAddressRequest shippingAddress;
     private List<CheckoutItemResponse> items;
+    private BigDecimal subtotal;
+    private BigDecimal discountAmount;
+    private String couponCode;
     private BigDecimal totalAmount;
     private LocalDateTime createdAt;
 }

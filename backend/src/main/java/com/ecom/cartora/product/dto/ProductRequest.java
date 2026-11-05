@@ -19,6 +19,10 @@ public class ProductRequest {
     @Size(max = 200, message = "Description cannot exceed 200 characters")
     private String description;
 
+    @Size(max = 2048)
+    @Pattern(regexp = "^$|https?://\\S+$", message = "Image URL must use HTTP or HTTPS")
+    private String imageUrl;
+
     @Positive(message = "Price must be greater than zero")
     private BigDecimal price;
 

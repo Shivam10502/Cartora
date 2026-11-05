@@ -1,7 +1,10 @@
 package com.ecom.cartora.order;
 
 import com.ecom.cartora.order.dto.OrderResponse;
+import com.ecom.cartora.order.dto.CreateOrderRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,8 +17,10 @@ public class OrderController {
     private OrderService orderService;
 
     @PostMapping
-    public OrderResponse createOrder() {
-        return orderService.createOrder();
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrderResponse createOrder(
+            @Valid @RequestBody CreateOrderRequest request) {
+        return orderService.createOrder(request.getCouponCode(), request.getShippingAddress());
     }
 
     @GetMapping
@@ -25,13 +30,13 @@ public class OrderController {
 
     @GetMapping("/{orderId}")
     public OrderResponse getOrderById(
-            @PathVariable Long orderId) {
+            @PathVariable("orderId") Long orderId) {
         return orderService.getOrderById(orderId);
     }
 
     @PutMapping("/{orderId}/cancel")
     public OrderResponse cancelOrder(
-            @PathVariable Long orderId) {
+            @PathVariable("orderId") Long orderId) {
         return orderService.cancelOrder(orderId);
     }
 }

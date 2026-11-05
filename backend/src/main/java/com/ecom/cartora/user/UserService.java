@@ -66,14 +66,14 @@ public class UserService {
     @Transactional
     public UserResponse registerNewUser(UserRegisterRequest request) {
 
-        if (repo.existsByEmail(request.getEmail())) {
+        if (repo.existsByEmailIgnoreCase(request.getEmail().trim())) {
             throw new UserAlreadyExistsException("Email already exists");
         }
 
         User user = new User();
 
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(request.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(Role.CUSTOMER);
 

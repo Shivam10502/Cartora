@@ -3,7 +3,10 @@ package com.ecom.cartora.category;
 import com.ecom.cartora.category.dto.CategoryRequest;
 import com.ecom.cartora.category.dto.CategoryResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,32 +18,37 @@ public class CategoryController {
     @Autowired
     private CategoryService service;
 
-
     @PostMapping
-    public CategoryResponse addCategory(@Valid @RequestBody CategoryRequest request){
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('ADMIN')")
+    public CategoryResponse addCategory(@Valid @RequestBody CategoryRequest request) {
         return service.createCategory(request);
     }
 
     @GetMapping("/{id}")
-    public CategoryResponse getCategory(@PathVariable Long id){
+    public CategoryResponse getCategory(@PathVariable("id") Long id) {
 
         return service.getCategoryById(id);
     }
+
     @GetMapping
-    public List<CategoryResponse> getAllCategories(){
+    public List<CategoryResponse> getAllCategories() {
         return service.getAllCategories();
     }
 
     @PutMapping("/{id}")
-    public CategoryResponse updateCategory(@PathVariable Long id,
-                                   @Valid @RequestBody CategoryRequest request){
+    @PreAuthorize("hasRole('ADMIN')")
+    public CategoryResponse updateCategory(@PathVariable("id") Long id,
+            @Valid @RequestBody CategoryRequest request) {
 
-        return service.updateCategory(id,request);
+        return service.updateCategory(id, request);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteCategory(@PathVariable Long id){
-         service.deleteCategory(id);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteCategory(@PathVariable("id") Long id) {
+        service.deleteCategory(id);
+        return ResponseEntity.noContent().build();
     }
 
 }
