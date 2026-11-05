@@ -97,7 +97,8 @@ class RefundServiceTest {
         org.springframework.http.client.ClientHttpRequestFactory requestFactory = request -> {
             throw new java.io.IOException("timeout");
         };
-        RestClient timeoutClient = RestClient.builder().requestFactory(requestFactory).baseUrl("https://example.test").build();
+        RestClient timeoutClient = RestClient.builder().requestFactory(requestFactory).baseUrl("https://example.test")
+                .build();
         RefundService timeoutService = new RefundService(properties, timeoutClient, paymentRepo, refundRepo, orderRepo);
         properties.setKeyId("key");
         properties.setKeySecret("secret");
