@@ -1,24 +1,20 @@
-﻿# API Documentation
+# API Documentation
 
 Base URL: `http://localhost:8080`
 
-All endpoints except registration, login, password-reset requests, and catalog `GET` routes require a JWT bearer token. Product and category write endpoints require the `ADMIN` role. Requests and responses use JSON unless noted. Exact error payloads are handled by the global exception handler and security handlers.
-
-Successful creation endpoints for accounts, products, categories, orders, coupons, reviews, and addresses return `201 Created`. Updates return `200 OK`; deletes return `204 No Content` where a response body is not needed.
+All endpoints except registration, login, and catalog `GET` routes require a JWT bearer token. Product and category write endpoints require the `ADMIN` role. Requests and responses use JSON unless noted. Exact error payloads are handled by the global exception handler and security handlers.
 
 ## Authentication and Account
 
-| Method | Path                     | Access        | Purpose                                                            |
-| ------ | ------------------------ | ------------- | ------------------------------------------------------------------ |
-| `POST` | `/api/users/register`    | Public        | Register a customer; role is assigned as `CUSTOMER` by the backend |
-| `POST` | `/api/auth/login`        | Public        | Authenticate and receive `{ "token": "..." }`                      |
-| `POST` | `/api/auth/forgot-password` | Public      | Request a reset link; response does not reveal whether the email exists |
-| `PUT`  | `/api/auth/reset-password`  | Public      | Consume a valid one-time token and set a new password               |
-| `GET`  | `/api/users/me`          | Authenticated | Read the current profile                                           |
-| `PUT`  | `/api/users/me`          | Authenticated | Update the current user's name                                     |
-| `PUT`  | `/api/users/me/password` | Authenticated | Change password using current and new password                     |
-| `GET`  | `/api/users/me/recently-viewed` | Authenticated | List up to five most recently viewed products for this account |
-| `POST` | `/api/users/me/recently-viewed/{productId}` | Authenticated | Record a product view and retain the five newest products |
+| Method | Path                        | Access        | Purpose                                                                 |
+| ------ | --------------------------- | ------------- | ----------------------------------------------------------------------- |
+| `POST` | `/api/users/register`       | Public        | Register a customer; role is assigned as `CUSTOMER` by the backend      |
+| `POST` | `/api/auth/login`           | Public        | Authenticate and receive `{ "token": "..." }`                           |
+| `POST` | `/api/auth/forgot-password` | Public        | Request a reset link; response does not reveal whether the email exists |
+| `PUT`  | `/api/auth/reset-password`  | Public        | Consume a valid one-time token and set a new password                   |
+| `GET`  | `/api/users/me`             | Authenticated | Read the current profile                                                |
+| `PUT`  | `/api/users/me`             | Authenticated | Update the current user's name                                          |
+| `PUT`  | `/api/users/me/password`    | Authenticated | Change password using current and new password                          |
 
 Reset tokens are stored as SHA-256 hashes, expire after 30 minutes, are consumed once, and are rate-limited per account. SMTP must be configured for reset emails and post-payment order confirmations. When email is not configured, reset requests still return the same generic response but no reset link can be delivered.
 
@@ -40,16 +36,15 @@ Example login:
 | `POST`   | `/api/products`        | Admin  | Create a product                               |
 | `PUT`    | `/api/products/{id}`   | Admin  | Update a product                               |
 | `DELETE` | `/api/products/{id}`   | Admin  | Delete a product                               |
-| `POST`   | `/api/products/{id}/image` | Admin | Upload a JPEG, PNG, or WebP image (multipart field `file`, max 5 MB) |
 | `GET`    | `/api/categories`      | Public | List categories                                |
 | `GET`    | `/api/categories/{id}` | Public | Read one category                              |
 | `POST`   | `/api/categories`      | Admin  | Create a category                              |
 | `PUT`    | `/api/categories/{id}` | Admin  | Update a category                              |
 | `DELETE` | `/api/categories/{id}` | Admin  | Delete a category                              |
 
-Product create/update requests accept an optional HTTP(S) `imageUrl`, returned in product responses. Admin uploads replace the product image URL with a generated `/uploads/...` path. Compose persists uploaded files in the `cartora-product-images` volume.
+Product create/update requests accept an optional HTTP(S) `imageUrl`, returned in product responses. The backend stores the URL only; it does not upload image files.
 
-Product create/update requests may include an optional `imageUrl` using HTTP or HTTPS. Admin uploads replace it with a generated `/uploads/...` path; Compose persists uploaded files in the `cartora-product-images` volume.
+Product create/update requests may include an optional `imageUrl` using HTTP or HTTPS. The URL is returned with product responses. The backend does not upload or store image files.
 
 Product search query parameters are `search`, `categoryId`, `minPrice`, `maxPrice`, `page`, `size`, `sortBy`, and `direction`. Defaults are page `0`, size `10`, `createdAt`, and `desc`. Supported sort fields are `name`, `price`, and `createdAt`; size is limited to 1-100.
 
@@ -90,13 +85,13 @@ Checkout previews the address, current stock, coupon discount, and total. Includ
 
 ## Orders and Payments
 
-| Method | Path                           | Access        | Purpose                                                                                  |
-| ------ | ------------------------------ | ------------- | ---------------------------------------------------------------------------------------- |
+| Method | Path                           | Access        | Purpose                                                                        |
+| ------ | ------------------------------ | ------------- | ------------------------------------------------------------------------------ |
 | `POST` | `/api/orders`                  | Authenticated | Create a pending order; body requires `shippingAddress`, optional `couponCode` |
-| `GET`  | `/api/orders`                  | Authenticated | List the caller's orders                                                                 |
-| `GET`  | `/api/orders/{orderId}`        | Owner         | Read order details                                                                       |
-| `PUT`  | `/api/orders/{orderId}/cancel` | Owner         | Cancel a pending order and restore stock                                                 |
-| `POST` | `/api/payments`                | Owner         | Attempt a simulated payment when the simulator is configured                              |
+| `GET`  | `/api/orders`                  | Authenticated | List the caller's orders                                                       |
+| `GET`  | `/api/orders/{orderId}`        | Owner         | Read order details                                                             |
+| `PUT`  | `/api/orders/{orderId}/cancel` | Owner         | Cancel a pending order and restore stock                                       |
+| `POST` | `/api/payments`                | Owner         | Attempt a simulated payment when the simulator is configured                   |
 
 Admin order management:
 
@@ -116,24 +111,22 @@ Payment request:
 }
 ```
 
-Supported simulated payment methods: `CARD`, `UPI`, `NET_BANKING`, `COD`. The simulator returns a randomized test success/failure outcome. New orders reserve stock before payment; cancellation releases it, and successful payment confirms the order. Pending reservations expire after 30 minutes by default; a late captured gateway payment for a cancelled order is refunded. Payment statuses include `PENDING`, `SUCCESS`, `FAILED`, `REFUND_PENDING`, `PARTIALLY_REFUNDED`, and `REFUNDED`.
+Supported simulated payment methods: `CARD`, `UPI`, `NET_BANKING`, `COD`. The simulator returns a randomized test success/failure outcome. New orders reserve stock before payment; cancellation releases it, and successful payment confirms the order. Payment statuses include `PENDING`, `SUCCESS`, `FAILED`, `REFUND_PENDING`, and `REFUNDED`.
 
 When `PAYMENT_PROVIDER=razorpay`, the storefront calls `GET /api/payments/provider`, `POST /api/payments/gateway-order`, and `POST /api/payments/verify`. The server creates gateway orders and validates callback signatures and provider-side amount, currency, order, and capture state. `POST /api/payments/webhook` accepts signed, idempotent payment and refund events. Configure the key ID, key secret, and webhook secret in the backend environment.
 
 Admin reporting endpoints are `GET /api/admin/customers`, `GET /api/admin/payments`, `GET /api/admin/payments/{paymentId}/refunds`, and `GET /api/admin/dashboard` with `GET /api/admin/dashboard/sales?days=14`. Full Razorpay refunds are submitted with `POST /api/admin/payments/{paymentId}/refunds`; an optional body `{ "amount": 10.00 }` requests a partial refund.
 
-Refund intents and their idempotency keys are persisted before calling Razorpay. If the provider response is ambiguous, the API returns a refund in `REQUESTED` state; retry the same request with the same amount to reuse its key and payload. Do not initiate a different refund while a request remains unresolved.
-
 ## Addresses
 
 | Method   | Path                          | Access        | Purpose                                                   |
 | -------- | ----------------------------- | ------------- | --------------------------------------------------------- |
-| `POST`   | `/api/addresses`              | Authenticated | Create an address (first address becomes default; mutations are serialized per account) |
+| `POST`   | `/api/addresses`              | Authenticated | Create an address (first address becomes default)         |
 | `GET`    | `/api/addresses`              | Authenticated | List the caller's addresses                               |
 | `GET`    | `/api/addresses/{id}`         | Owner         | Read one address                                          |
 | `PUT`    | `/api/addresses/{id}`         | Owner         | Update one address                                        |
 | `DELETE` | `/api/addresses/{id}`         | Owner         | Delete an address; choose a replacement default if needed |
-| `PATCH`  | `/api/addresses/{id}/default` | Owner         | Select the account's only default address                 |
+| `PATCH`  | `/api/addresses/{id}/default` | Owner         | Select the default address                                |
 
 Postal codes are validated as six digits by the current request DTO.
 
@@ -195,4 +188,4 @@ Coupon request example:
 
 ## Current Boundaries
 
-Product images can be supplied as validated HTTP(S) URLs or uploaded by an admin as JPEG, PNG, or WebP files up to 5 MB using `POST /api/products/{id}/image` with multipart field `file`. Uploaded files use generated names and are served through `/uploads/`. Signed-in customers can list and record the five most recently viewed products; guest history stays in browser storage and merges into the account after sign-in. Coupon use limits/per-customer limits are not implemented.
+Binary image uploads are not implemented; product images use validated HTTP(S) URLs. Recently viewed IDs are stored locally in the browser and reloaded through product endpoints. Coupon use limits/per-customer limits are not implemented.
