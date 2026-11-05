@@ -73,12 +73,14 @@ public class RefundService {
     public void updateRefundStatus(String providerRefundId, boolean processed) {
         PaymentRefund refund = refundRepo.findByProviderRefundId(providerRefundId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund was not found"));
-        if (refund.getStatus() != RefundStatus.PENDING) return;
         Long orderId = refund.getPayment().getOrder().getId();
         orderRepo.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order doesn't exist"));
         Payment payment = paymentRepo.findByOrderIdForUpdate(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
+        refund = refundRepo.findByProviderRefundId(providerRefundId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund was not found"));
+        if (refund.getStatus() != RefundStatus.PENDING && refund.getStatus() != RefundStatus.REQUESTED) return;
         if (!payment.getId().equals(refund.getPayment().getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Refund payment changed while processing");
         }
@@ -89,7 +91,7 @@ public class RefundService {
     }
 
     private RefundResponse issueRefund(Payment payment, BigDecimal requestedAmount) {
-        List<PaymentRefund> refunds = refundRepo.findByPaymentIdOrderByCreatedAtDesc(payment.getId());
+        List<PaymentRefund> refunds = refundRepo.findByPaymentIdOrderByCreatedAtDescForUpdate(payment.getId());
         PaymentRefund retryable = refunds.stream()
                 .filter(refund -> refund.getStatus() == RefundStatus.REQUESTED)
                 .findFirst().orElse(null);
@@ -109,6 +111,9 @@ public class RefundService {
         if (amount.signum() <= 0 || amount.compareTo(remaining) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund amount exceeds the remaining refundable amount");
         }
+        if (amount.scale() > 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refund amount must have at most two decimal places");
+        }
 
         try {
             amount.movePointRight(2).longValueExact();
@@ -126,6 +131,9 @@ public class RefundService {
         refund.setCreatedAt(now);
         refund.setUpdatedAt(now);
         refund = refundRepo.saveAndFlush(refund);
+        payment.setStatus(PaymentStatus.REFUND_PENDING);
+        payment.setUpdatedAt(now);
+        paymentRepo.save(payment);
         return submitRefund(payment, refund);
     }
 

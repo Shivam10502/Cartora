@@ -39,7 +39,7 @@ public class EmailNotificationService {
         try {
             sender.send(message);
         } catch (MailException ex) {
-            logger.warn("Cartora email delivery failed for recipient domain {}", domainOf(recipient));
+            logger.warn("Cartora email delivery failed for recipient domain {}", domainOf(recipient), ex);
         }
     }
 

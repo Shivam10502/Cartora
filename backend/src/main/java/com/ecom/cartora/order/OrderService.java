@@ -28,7 +28,6 @@ import com.ecom.cartora.product.ProductRepo;
 import com.ecom.cartora.product.ProductInventoryService;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -45,29 +44,27 @@ import java.util.Map;
 @Service
 public class OrderService {
 
-        @Autowired
-        private OrderRepo orderRepo;
+        private final OrderRepo orderRepo;
+        private final OrderItemRepo orderItemRepo;
+        private final UserRepo userRepo;
+        private final CartRepo cartRepo;
+        private final CartItemRepo cartItemRepo;
+        private final CouponService couponService;
+        private final ProductInventoryService productInventoryService;
+        private final PaymentRepo paymentRepo;
 
-        @Autowired
-        private OrderItemRepo orderItemRepo;
-
-        @Autowired
-        private UserRepo userRepo;
-
-        @Autowired
-        private CartRepo cartRepo;
-
-        @Autowired
-        private CartItemRepo cartItemRepo;
-
-        @Autowired
-        private CouponService couponService;
-
-        @Autowired
-        private ProductInventoryService productInventoryService;
-
-        @Autowired
-        private PaymentRepo paymentRepo;
+        public OrderService(OrderRepo orderRepo, OrderItemRepo orderItemRepo, UserRepo userRepo,
+                CartRepo cartRepo, CartItemRepo cartItemRepo, CouponService couponService,
+                ProductInventoryService productInventoryService, PaymentRepo paymentRepo) {
+                this.orderRepo = orderRepo;
+                this.orderItemRepo = orderItemRepo;
+                this.userRepo = userRepo;
+                this.cartRepo = cartRepo;
+                this.cartItemRepo = cartItemRepo;
+                this.couponService = couponService;
+                this.productInventoryService = productInventoryService;
+                this.paymentRepo = paymentRepo;
+        }
 
         private User getUser() {
 
@@ -238,6 +235,7 @@ public class OrderService {
                 return buildOrderResponse(order);
         }
 
+        @Transactional(readOnly = true)
         public List<OrderResponse> getMyOrders() {
 
                 User user = getUser();
@@ -283,6 +281,7 @@ public class OrderService {
                 return buildOrderResponse(order);
         }
 
+        @Transactional(readOnly = true)
         public OrderResponse getOrderById(Long orderId) {
 
                 User user = getUser();

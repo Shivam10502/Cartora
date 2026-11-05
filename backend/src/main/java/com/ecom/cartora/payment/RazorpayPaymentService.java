@@ -182,6 +182,11 @@ public class RazorpayPaymentService {
         Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
                 .orElseThrow(() -> new PaymentCannotBeDone("No payment attempt exists for this order"));
         if (payment.getStatus() == PaymentStatus.SUCCESS) return toPaymentResponse(payment);
+        if (payment.getStatus() == PaymentStatus.REFUND_PENDING
+                || payment.getStatus() == PaymentStatus.PARTIALLY_REFUNDED
+                || payment.getStatus() == PaymentStatus.REFUNDED) {
+            throw new PaymentCannotBeDone("A refund is pending or has already been issued for this payment");
+        }
         if ((order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CANCELLED)
                 || !request.razorpayOrderId().equals(payment.getProviderOrderId())) {
             throw new PaymentCannotBeDone("The payment does not match this pending order");

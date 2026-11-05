@@ -5,7 +5,6 @@ import com.ecom.cartora.user.dto.ChangePasswordRequest;
 import com.ecom.cartora.user.dto.UpdateProfileRequest;
 import com.ecom.cartora.user.dto.UserRegisterRequest;
 import com.ecom.cartora.user.dto.UserResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,11 +19,13 @@ import java.time.LocalDateTime;
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepo repo;
+    private final UserRepo repo;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    public UserService(UserRepo repo, PasswordEncoder passwordEncoder) {
+        this.repo = repo;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     private UserResponse toResponse(User user) {
 
@@ -66,14 +67,15 @@ public class UserService {
     @Transactional
     public UserResponse registerNewUser(UserRegisterRequest request) {
 
-        if (repo.existsByEmailIgnoreCase(request.getEmail().trim())) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        if (repo.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new UserAlreadyExistsException("Email already exists");
         }
 
         User user = new User();
 
-        user.setName(request.getName());
-        user.setEmail(request.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
+        user.setName(request.getName().trim());
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(Role.CUSTOMER);
 

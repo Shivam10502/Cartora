@@ -70,7 +70,7 @@ class CheckoutServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user.getEmail(), "", List.of()));
         when(userRepo.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(cartRepo.findByUserId(user.getId())).thenReturn(Optional.of(cart));
+        when(cartRepo.findByUserIdForUpdate(user.getId())).thenReturn(Optional.of(cart));
         lenient().when(productInventoryService.lockAndRefresh(org.mockito.ArgumentMatchers.anyCollection()))
                 .thenAnswer(invocation -> java.util.Map.of(product.getId(), product));
     }

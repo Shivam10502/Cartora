@@ -6,7 +6,7 @@ import type { AdminCustomer, AdminDashboard, Cart, Category, Coupon, Order, Paym
 import './App.css'
 import './address.css'
 
-type AppState = { user: User | null; cart: Cart | null; refreshCart: () => Promise<void>; signIn: (email: string, password: string) => Promise<void>; signOut: () => void }
+type AppState = { user: User | null; cart: Cart | null; refreshCart: () => Promise<void>; signIn: (email: string, password: string) => Promise<void>; signOut: () => void; updateUser: (user: User) => void }
 type RazorpayCheckoutResult = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }
 type RazorpayCheckoutOptions = {
   key: string
@@ -50,6 +50,7 @@ export default function App() {
     try { setCart(await getCart()) } catch { setCart(null) }
   }, [])
   const signOut = useCallback(() => { localStorage.removeItem('cartora.token'); setUser(null); setCart(null) }, [])
+  const updateUser = useCallback((updatedUser: User) => setUser(updatedUser), [])
   const signIn = useCallback(async (email: string, password: string) => {
     const { data } = await api.post<{ token: string }>('/api/auth/login', { email, password })
     localStorage.setItem('cartora.token', data.token)
@@ -66,7 +67,7 @@ export default function App() {
     window.addEventListener('cartora:unauthorized', expireSession)
     return () => window.removeEventListener('cartora:unauthorized', expireSession)
   }, [])
-  return <BrowserRouter><State.Provider value={{ user, cart, refreshCart, signIn, signOut }}>{ready ? <Routes><Route element={<StoreLayout />}>
+  return <BrowserRouter><State.Provider value={{ user, cart, refreshCart, signIn, signOut, updateUser }}>{ready ? <Routes><Route element={<StoreLayout />}>
     <Route index element={<Browse />} /><Route path="product/:id" element={<ProductDetails />} />
     <Route path="login" element={<AuthPage />} /><Route path="register" element={<AuthPage register />} />
     <Route path="forgot-password" element={<ForgotPasswordPage />} /><Route path="reset-password" element={<ResetPasswordPage />} />
@@ -105,6 +106,7 @@ function Browse() {
   const [recentProducts, setRecentProducts] = useState<Product[]>([])
   const [error, setError] = useState('')
   const search = params.get('search') ?? '', categoryId = params.get('categoryId') ?? ''
+  const minPrice = params.get('minPrice') ?? '', maxPrice = params.get('maxPrice') ?? ''
   const sortBy = params.get('sortBy') ?? 'createdAt', direction = params.get('direction') ?? 'desc'
   const pageNumber = Number(params.get('page') ?? 0)
   useEffect(() => { getCategories().then(setCategories).catch(() => setCategories([])) }, [])
@@ -119,9 +121,26 @@ function Browse() {
   const update = (key: string, value: string) => { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); next.delete('page'); setParams(next) }
   return <main><section className="hero-banner"><div className="hero-copy"><span className="eyebrow">OBJECTS WITH INTENTION</span><h1>Good things,<br /><em>kept close.</em></h1><p>Useful pieces, considered details, and a little joy in the everyday.</p><a className="primary-button" href="#catalog">Explore the collection <ArrowRight size={17} /></a></div><div className="hero-note"><span>01 / EDIT</span><b>Less, but<br />better.</b><small>Our current selection</small></div></section>
     <section className="catalog" id="catalog"><div className="section-heading"><div><span className="eyebrow">THE CARTORA EDIT</span><h2>Find your next favorite.</h2></div><span className="result-count">{page?.totalElements ?? '...'} pieces</span></div>
-      <div className="toolbar"><label className="search-box"><Search size={17} /><input value={search} onChange={(event) => update('search', event.target.value)} placeholder="Search the collection" /></label><select aria-label="Filter by category" value={categoryId} onChange={(event) => update('categoryId', event.target.value)}><option value="">All categories</option>{categories.map((category) => <option value={category.categoryId} key={category.categoryId}>{category.name}</option>)}</select><label className="sort-box"><ArrowDownUp size={16} /><select aria-label="Sort products" value={`${sortBy}:${direction}`} onChange={(event) => { const [field, order] = event.target.value.split(':'); update('sortBy', field); update('direction', order) }}><option value="createdAt:desc">Recently added</option><option value="price:asc">Price: low to high</option><option value="price:desc">Price: high to low</option><option value="name:asc">Name: A to Z</option></select></label></div>
+      <div className="toolbar"><DebouncedSearch key={search} value={search} /><select aria-label="Filter by category" value={categoryId} onChange={(event) => update('categoryId', event.target.value)}><option value="">All categories</option>{categories.map((category) => <option value={category.categoryId} key={category.categoryId}>{category.name}</option>)}</select><label className="price-filter">From<input aria-label="Minimum price" type="number" min="0" step="0.01" value={minPrice} onChange={(event) => update('minPrice', event.target.value)} placeholder="Min ₹" /></label><label className="price-filter">To<input aria-label="Maximum price" type="number" min="0" step="0.01" value={maxPrice} onChange={(event) => update('maxPrice', event.target.value)} placeholder="Max ₹" /></label><label className="sort-box"><ArrowDownUp size={16} /><select aria-label="Sort products" value={`${sortBy}:${direction}`} onChange={(event) => { const [field, order] = event.target.value.split(':'); update('sortBy', field); update('direction', order) }}><option value="createdAt:desc">Recently added</option><option value="price:asc">Price: low to high</option><option value="price:desc">Price: high to low</option><option value="name:asc">Name: A to Z</option></select></label></div>
       {error && <p className="notice error">{error}</p>}{page?.content.length ? <div className="product-grid">{page.content.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}</div> : <div className="empty-state"><ShoppingBag size={28} /><h3>{page ? 'No pieces found' : error ? 'The collection is unavailable' : 'Loading the collection'}</h3><p>{page ? 'Try another search or category.' : error ? 'The Cartora API could not be reached. Please try again shortly.' : 'Connecting to the Cartora collection.'}</p></div>}
       {page && page.totalPages > 1 && <div className="pagination"><button disabled={page.first} onClick={() => update('page', String(pageNumber - 1))}><ChevronLeft size={17} /> Previous</button><span>Page {page.page + 1} of {page.totalPages}</span><button disabled={page.last} onClick={() => update('page', String(pageNumber + 1))}>Next <ChevronRight size={17} /></button></div>}</section>{recentProducts.length > 0 && <section className="recent-section"><div className="section-heading"><div><span className="eyebrow">A LITTLE LOOK BACK</span><h2>Recently viewed.</h2></div></div><div className="product-grid">{recentProducts.map((recentProduct, index) => <ProductCard key={recentProduct.id} product={recentProduct} index={index} />)}</div></section>}</main>
+}
+
+function DebouncedSearch({ value }: { value: string }) {
+  const [params, setParams] = useSearchParams()
+  const [text, setText] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (text.trim() === value) return
+      const next = new URLSearchParams(params)
+      if (text.trim()) next.set('search', text.trim())
+      else next.delete('search')
+      next.delete('page')
+      setParams(next)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [text, value, params, setParams])
+  return <label className="search-box"><Search size={17} /><input value={text} onChange={(event) => setText(event.target.value)} placeholder="Search the collection" /></label>
 }
 
 const productPhotos = ['photo-1494438639946-1ebd1d20bf85', 'photo-1503602642458-232111445657', 'photo-1523275335684-37898b6baf30', 'photo-1526170375885-4d8ecf77b99f']
@@ -407,11 +426,12 @@ function OrderDetailsPage() {
 }
 
 function ProfilePage() {
-  const { user } = useApp(); const [message, setMessage] = useState('')
+  const { user, updateUser } = useApp(); const [message, setMessage] = useState('')
+  const [savedName, setSavedName] = useState(user?.name ?? '')
   if (!user) return <SignInPrompt />
-  const save = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); try { await api.put('/api/users/me', { name: form.get('name') }); setMessage('Profile updated.') } catch (error) { setMessage(getErrorMessage(error)) } }
+  const save = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const name = String(form.get('name')).trim(); try { const { data } = await api.put<User>('/api/users/me', { name }); updateUser(data); setSavedName(data.name); setMessage('Profile updated.') } catch (error) { setMessage(getErrorMessage(error)) } }
   const changePassword = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); try { await api.put('/api/users/me/password', { currentPassword: form.get('currentPassword'), newPassword: form.get('newPassword') }); event.currentTarget.reset(); setMessage('Password changed.') } catch (error) { setMessage(getErrorMessage(error)) } }
-  return <main className="content-page profile-page"><span className="eyebrow">YOUR ACCOUNT</span><h1>Profile.</h1><div className="profile-sections"><form className="auth-form profile-form" onSubmit={save}><h2>Personal details</h2><label>Name<input name="name" defaultValue={user.name} required maxLength={30} /></label><label>Email<input value={user.email} disabled /></label><span className="role-label">Account type <strong>{user.role}</strong></span><button className="primary-button">Save changes <Check size={16} /></button></form><form className="auth-form profile-form" onSubmit={changePassword}><h2>Change password</h2><label>Current password<input name="currentPassword" type="password" required autoComplete="current-password" /></label><label>New password<input name="newPassword" type="password" required minLength={8} maxLength={72} pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S+$" autoComplete="new-password" /></label><small>Use uppercase, lowercase, a number, and a special character.</small><button className="primary-button">Update password <Check size={16} /></button></form></div>{message && <p className="notice">{message}</p>}</main>
+  return <main className="content-page profile-page"><span className="eyebrow">YOUR ACCOUNT</span><h1>Profile.</h1><div className="profile-sections"><form className="auth-form profile-form" onSubmit={save}><h2>Personal details</h2><label>Name<input name="name" value={savedName} onChange={(event) => setSavedName(event.target.value)} required maxLength={30} /></label><label>Email<input value={user.email} disabled /></label><span className="role-label">Account type <strong>{user.role}</strong></span><button className="primary-button">Save changes <Check size={16} /></button></form><form className="auth-form profile-form" onSubmit={changePassword}><h2>Change password</h2><label>Current password<input name="currentPassword" type="password" required autoComplete="current-password" /></label><label>New password<input name="newPassword" type="password" required minLength={8} maxLength={72} pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S+$" autoComplete="new-password" /></label><small>Use uppercase, lowercase, a number, and a special character.</small><button className="primary-button">Update password <Check size={16} /></button></form></div>{message && <p className="notice">{message}</p>}</main>
 }
 
 type SavedAddress = AddressForm & { id: number; defaultAddress: boolean }
@@ -594,15 +614,18 @@ function AdminPaymentsPage() {
   if (user.role !== 'ADMIN') return <main className="content-page"><h1>Access restricted.</h1></main>
   const refund = async (payment: PaymentRecord) => {
     if (!payment.providerPaymentId) return
-    const enteredAmount = window.prompt(`Refund amount in INR for order ${payment.orderId}. Leave blank for the remaining amount.`)
+    const reconciling = payment.status === 'REFUND_PENDING'
+    const enteredAmount = window.prompt(reconciling
+      ? `A refund for order ${payment.orderId} is awaiting confirmation. Leave blank to safely retry the same request.`
+      : `Refund amount in INR for order ${payment.orderId}. Leave blank for the remaining amount.`)
     if (enteredAmount === null) return
     const amount = enteredAmount.trim() ? Number(enteredAmount) : undefined
     if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
       setError('Enter a refund amount greater than zero, or leave it blank for the remaining amount.')
       return
     }
-    try { await api.post(`/api/admin/payments/${payment.paymentId}/refunds`, amount === undefined ? {} : { amount }); setError('Refund submitted. The provider will report its final status.'); await load() }
+    try { const { data } = await api.post<{ status: string }>(`/api/admin/payments/${payment.paymentId}/refunds`, amount === undefined ? {} : { amount }); setError(data.status === 'REQUESTED' ? 'Refund request is awaiting provider confirmation. Retry safely from here to reconcile it.' : 'Refund submitted. The provider will report its final status.'); await load() }
     catch (cause) { setError(getErrorMessage(cause)) }
   }
-  return <main className="content-page admin-page"><span className="eyebrow">CARTORA / STUDIO</span><h1>Payments.</h1><p>Provider transactions and refund actions.</p>{error && <p className="notice">{error}</p>}{payments.length ? <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>Order</th><th>Amount</th><th>Provider</th><th>Status</th><th>Transaction</th><th>Action</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.paymentId}><td>#{payment.orderId}</td><td>{formatPrice(Number(payment.amount))}</td><td>{payment.paymentMethod}</td><td>{payment.status}</td><td>{payment.providerPaymentId ?? payment.transactionId}</td><td>{['SUCCESS', 'PARTIALLY_REFUNDED'].includes(payment.status) && payment.providerPaymentId ? <button className="text-button" onClick={() => void refund(payment)}>Refund</button> : '—'}</td></tr>)}</tbody></table></div> : !error && <div className="empty-state"><h3>No payments yet.</h3></div>}</main>
+  return <main className="content-page admin-page"><span className="eyebrow">CARTORA / STUDIO</span><h1>Payments.</h1><p>Provider transactions and refund actions.</p>{error && <p className="notice">{error}</p>}{payments.length ? <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>Order</th><th>Amount</th><th>Provider</th><th>Status</th><th>Transaction</th><th>Action</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.paymentId}><td>#{payment.orderId}</td><td>{formatPrice(Number(payment.amount))}</td><td>{payment.paymentMethod}</td><td>{payment.status}</td><td>{payment.providerPaymentId ?? payment.transactionId}</td><td>{['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUND_PENDING'].includes(payment.status) && payment.providerPaymentId ? <button className="text-button" onClick={() => void refund(payment)}>{payment.status === 'REFUND_PENDING' ? 'Reconcile refund' : 'Refund'}</button> : '—'}</td></tr>)}</tbody></table></div> : !error && <div className="empty-state"><h3>No payments yet.</h3></div>}</main>
 }

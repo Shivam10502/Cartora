@@ -5,28 +5,32 @@ import com.ecom.cartora.security.JwtService;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
 import com.ecom.cartora.user.dto.LoginRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
 
 @Service
 public class AuthService {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepo userRepo;
+    private final JwtService jwtService;
 
-    @Autowired
-    private UserRepo userRepo;
+    public AuthService(AuthenticationManager authenticationManager, UserRepo userRepo, JwtService jwtService) {
+        this.authenticationManager = authenticationManager;
+        this.userRepo = userRepo;
+        this.jwtService = jwtService;
+    }
 
-    @Autowired
-    private JwtService jwtService;
-
+    @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
 
-        String email = request.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         email,
@@ -38,15 +42,12 @@ public class AuthService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found"));
 
-        UserDetails userDetails =
-                org.springframework.security.core.userdetails.User
-                        .withUsername(user.getEmail())
-                        .password(user.getPassword())
-                        .roles(user.getRole().name())
-                        .build();
-
-        String token =
-                jwtService.generateToken(userDetails);
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPassword())
+                .roles(user.getRole().name())
+                .build();
+        String token = jwtService.generateToken(userDetails);
 
         return new LoginResponse(token);
     }

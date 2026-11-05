@@ -94,7 +94,7 @@ class PaymentServiceTest {
 
         when(userRepo.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         when(orderRepo.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-        when(paymentRepo.findByOrderId(order.getId())).thenReturn(Optional.empty());
+        when(paymentRepo.findByOrderIdForUpdate(order.getId())).thenReturn(Optional.empty());
         when(paymentRepo.save(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }

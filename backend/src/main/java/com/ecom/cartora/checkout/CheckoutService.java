@@ -16,7 +16,6 @@ import com.ecom.cartora.product.Product;
 import com.ecom.cartora.product.ProductInventoryService;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -26,24 +25,25 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CheckoutService {
 
-    @Autowired
-    private CartRepo cartRepo;
+    private final CartRepo cartRepo;
+    private final CartItemRepo cartItemRepo;
+    private final UserRepo userRepo;
+    private final CouponService couponService;
+    private final ProductInventoryService productInventoryService;
 
-    @Autowired
-    private CartItemRepo cartItemRepo;
-
-    @Autowired
-    private UserRepo userRepo;
-
-    @Autowired
-    private CouponService couponService;
-
-    @Autowired
-    private ProductInventoryService productInventoryService;
+    public CheckoutService(CartRepo cartRepo, CartItemRepo cartItemRepo, UserRepo userRepo,
+            CouponService couponService, ProductInventoryService productInventoryService) {
+        this.cartRepo = cartRepo;
+        this.cartItemRepo = cartItemRepo;
+        this.userRepo = userRepo;
+        this.couponService = couponService;
+        this.productInventoryService = productInventoryService;
+    }
 
     private User getUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -54,17 +54,12 @@ public class CheckoutService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
-    private Cart getUserCart(User user) {
-
-        return cartRepo.findByUserId(user.getId())
-                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
-    }
-
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public CheckoutResponse createCheckout(CheckoutRequest request) {
         User user = getUser();
 
-        Cart cart = getUserCart(user);
+        Cart cart = cartRepo.findByUserIdForUpdate(user.getId())
+                .orElseThrow(() -> new CartNotFoundException("Cart Not Found"));
 
         List<CartItem> cartItems = cartItemRepo.findByCartId(cart.getId());
 

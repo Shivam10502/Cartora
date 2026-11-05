@@ -25,7 +25,6 @@ import com.ecom.cartora.product.ProductRepo;
 import com.ecom.cartora.product.ProductInventoryService;
 import com.ecom.cartora.user.User;
 import com.ecom.cartora.user.UserRepo;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,32 +42,30 @@ import java.util.UUID;
 @Service
 public class PaymentService {
 
-    @Autowired
-    private PaymentRepo paymentRepo;
+    private final PaymentRepo paymentRepo;
+    private final UserRepo userRepo;
+    private final OrderRepo orderRepo;
+    private final OrderItemRepo orderItemRepo;
+    private final CartRepo cartRepo;
+    private final CartItemRepo cartItemRepo;
+    private final SimulatedPaymentProcessor simulatedPaymentProcessor;
+    private final ProductInventoryService productInventoryService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    @Autowired
-    private UserRepo userRepo;
-
-    @Autowired
-    private OrderRepo orderRepo;
-
-    @Autowired
-    private OrderItemRepo orderItemRepo;
-
-    @Autowired
-    private CartRepo cartRepo;
-
-    @Autowired
-    private CartItemRepo cartItemRepo;
-
-    @Autowired
-    private SimulatedPaymentProcessor simulatedPaymentProcessor;
-
-    @Autowired
-    private ProductInventoryService productInventoryService;
-
-    @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    public PaymentService(PaymentRepo paymentRepo, UserRepo userRepo, OrderRepo orderRepo,
+            OrderItemRepo orderItemRepo, CartRepo cartRepo, CartItemRepo cartItemRepo,
+            SimulatedPaymentProcessor simulatedPaymentProcessor, ProductInventoryService productInventoryService,
+            ApplicationEventPublisher eventPublisher) {
+        this.paymentRepo = paymentRepo;
+        this.userRepo = userRepo;
+        this.orderRepo = orderRepo;
+        this.orderItemRepo = orderItemRepo;
+        this.cartRepo = cartRepo;
+        this.cartItemRepo = cartItemRepo;
+        this.simulatedPaymentProcessor = simulatedPaymentProcessor;
+        this.productInventoryService = productInventoryService;
+        this.eventPublisher = eventPublisher;
+    }
 
     private User getUser() {
 
@@ -128,7 +125,7 @@ public class PaymentService {
          * PENDING -> payment already in progress
          * FAILED -> retry is allowed
          */
-        Payment payment = paymentRepo.findByOrderId(order.getId())
+        Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
                 .orElse(null);
 
         if (payment != null) {

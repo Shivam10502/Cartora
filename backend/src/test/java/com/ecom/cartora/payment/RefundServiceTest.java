@@ -57,6 +57,8 @@ class RefundServiceTest {
         when(orderRepo.findByIdForUpdate(11L)).thenReturn(Optional.of(order));
         when(paymentRepo.findByOrderIdForUpdate(11L)).thenReturn(Optional.of(payment));
         when(refundRepo.findByPaymentIdOrderByCreatedAtDesc(22L)).thenReturn(List.of(refund));
+        when(refundRepo.findByPaymentIdOrderByCreatedAtDescForUpdate(22L)).thenReturn(List.of(refund));
+        when(refundRepo.findByProviderRefundId("rf_1")).thenReturn(Optional.of(refund));
     }
 
     @Test
@@ -80,13 +82,22 @@ class RefundServiceTest {
     }
 
     @Test
+    void refundWebhookCanResolveAnAmbiguousRequestIntent() {
+        refund.setStatus(RefundStatus.REQUESTED);
+        service.updateRefundStatus("rf_1", true);
+
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+    }
+
+    @Test
     void duplicateRefundWebhookDoesNotReapplyTerminalTransition() {
         refund.setStatus(RefundStatus.PROCESSED);
 
         service.updateRefundStatus("rf_1", false);
 
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
-        verify(orderRepo, never()).findByIdForUpdate(11L);
+        verify(orderRepo).findByIdForUpdate(11L);
         verify(paymentRepo, never()).save(any(Payment.class));
     }
 
@@ -94,7 +105,8 @@ class RefundServiceTest {
     void ambiguousRefundCanBeRetriedWithTheSameDurableIdempotencyKey() {
         refund.setStatus(RefundStatus.REQUESTED);
         when(refundRepo.findByPaymentIdOrderByCreatedAtDesc(22L)).thenReturn(List.of(refund));
-        org.springframework.http.client.ClientHttpRequestFactory requestFactory = request -> {
+        when(refundRepo.findByPaymentIdOrderByCreatedAtDescForUpdate(22L)).thenReturn(List.of(refund));
+        org.springframework.http.client.ClientHttpRequestFactory requestFactory = (uri, method) -> {
             throw new java.io.IOException("timeout");
         };
         RestClient timeoutClient = RestClient.builder().requestFactory(requestFactory).baseUrl("https://example.test")

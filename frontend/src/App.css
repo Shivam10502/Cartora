@@ -44,6 +44,8 @@ footer .wordmark { font-size: 22px; }
 .search-box { flex: 1; }
 .search-box input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 11px; }
 .search-box input::placeholder { color: #9aa39b; }
+.price-filter { min-height: 42px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); padding: 0 8px; background: var(--white); color: #879188; font-size: 9px; }
+.price-filter input { width: 68px; border: 0; outline: 0; color: var(--ink); font-size: 10px; }
 .toolbar > select, .sort-box select { min-height: 42px; border: 1px solid var(--line); padding: 0 28px 0 12px; background: var(--white); color: #59675e; font-size: 10px; }
 .sort-box { padding-right: 0; }
 .sort-box select { border: 0; }
@@ -271,6 +273,8 @@ footer .wordmark { font-size: 22px; }
   .toolbar { flex-wrap: wrap; gap: 8px; }
   .search-box { flex: 1 0 100%; }
   .toolbar > select, .sort-box { flex: 1 1 0; width: 0; min-width: 0; }
+  .price-filter { flex: 1 1 0; min-width: 0; justify-content: space-between; }
+  .price-filter input { width: 62px; min-width: 0; }
   .sort-box { gap: 5px; padding-left: 7px; }
   .sort-box select { flex: 1 1 0; width: 0; min-width: 0; padding-right: 4px; }
   .product-grid { gap: 23px 11px; }
